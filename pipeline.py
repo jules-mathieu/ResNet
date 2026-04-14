@@ -47,7 +47,7 @@ def validate(model, loader, criterion):
 
 
 
-num_epochs = 20
+num_epochs = 5
 
 # CNN
 
@@ -114,12 +114,10 @@ print("ResNet Test accuracy :", test_acc)
 
 import pickle
 
-# Sauvegarde des résultats CNN
+# Save CNN results
 with open("results/results_cnn.pkl", "wb") as f:
     pickle.dump(results_cnn, f)
 
-# Sauvegarde des résultats ResNet
+# Save ResNet results
 with open("results/results_res.pkl", "wb") as f:
     pickle.dump(results_res, f)
-
-# Columns test_loss and test_acc can be used to produce bar test graph, but will not be used in this analysis

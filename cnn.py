@@ -1,62 +1,39 @@
 from torch.utils.data import random_split
-from torchvision import datasets, transforms
+from torchvision import transforms
 import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import tqdm as tqdm
-from data_import import path
-
-
-# Base transforms (commons)
-basic_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-])
-
-full_dataset = datasets.ImageFolder(root=path, transform=basic_transform)
-
-# Split proportion
-train_ratio, val_ratio, test_ratio = 0.7, 0.15, 0.15
-n_total = len(full_dataset)
-n_train = int(n_total * train_ratio)
-n_val   = int(n_total * val_ratio)
-n_test  = n_total - n_train - n_val
-
-train_set, val_set, test_set = random_split(
-    full_dataset,
-    [n_train, n_val, n_test],
-    generator=torch.Generator().manual_seed(42)
-)
-
-print("Train :", len(train_set))
-print("Val   :", len(val_set))
-print("Test  :", len(test_set))
+from data_processing import train_set, val_set, test_set, full_dataset, get_balanced_sampler, ApplyTransform
 
 
 # Data augmentation CNN : 
 
 train_transform_cnn = transforms.Compose([
     transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.1, contrast=0.1),
     transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-
-
-# Dataloaders
+train_data_cnn = ApplyTransform(train_set, transform=train_transform_cnn)
+val_data_cnn   = ApplyTransform(val_set, transform=train_transform_cnn)
+test_data_cnn  = ApplyTransform(test_set, transform=train_transform_cnn)
 
 batch_size = 32
 
-train_loader_cnn = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-val_loader_cnn   = DataLoader(val_set, batch_size=batch_size, shuffle=False)
-test_loader_cnn  = DataLoader(test_set, batch_size=batch_size, shuffle=False)
+train_loader_cnn = DataLoader(
+    train_data_cnn, 
+    batch_size=batch_size, 
+    sampler=get_balanced_sampler(train_set), 
+    shuffle=False
+)
+val_loader_cnn   = DataLoader(val_data_cnn, batch_size=batch_size, shuffle=False)
+test_loader_cnn  = DataLoader(test_data_cnn, batch_size=batch_size, shuffle=False)
 
-
+num_classes = len(full_dataset.class_to_idx)
 
 class PlainCNN(nn.Module):
-    def __init__(self, num_classes=5):
+    def __init__(self, num_classes=num_classes):
         super().__init__()
 
         self.conv_block1 = nn.Sequential(
@@ -82,7 +59,7 @@ class PlainCNN(nn.Module):
 
         self.fc_block = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 28 * 28, 256),   # après 3 pools : 224 → 112 → 56 → 28
+            nn.Linear(128 * 28 * 28, 256),   # after 3 pools : 224 -> 112 -> 56 -> 28
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
@@ -96,7 +73,7 @@ class PlainCNN(nn.Module):
         return x
 
 
-# Possible to replace mps -> cuda if nvidia
+# Replace mps -> cuda if nvidia
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 print("Device:", device)
